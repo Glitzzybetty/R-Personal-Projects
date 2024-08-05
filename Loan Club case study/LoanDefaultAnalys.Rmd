@@ -1,0 +1,1017 @@
+---
+title: "ABZ Loan Default Analysis"
+author: "Omotayo Ikudayisi"
+date: "`r Sys.Date()`"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: scroll
+    theme: flatly
+    highlight: zenburn
+---
+
+<style>
+.scrollable-table {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid #ddd;
+}
+
+.scrollable-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.scrollable-table th, .scrollable-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+</style>
+
+
+# <font size = "4">Insights</font>
+
+<font size = "4.5">
+
+This dashboard communicates the ABZ business Loan Default loan default analysis for loans issued from 2007 to 2013:
+
+-   **The Metadata Info** pane shows the data structure, before and after cleaning the data set, it shows visualization of missing values, data distribution and major statistics to look at before deciding on how to further manipulate/ analyse the data set. A clean data function was written to handle the data cleaning and other feature engineering.
+
+-   **The Loan Overview** pane shows various information into current loan status and general loan status which is formulated to contain just 2 factors of Default and non default. Finding shows that:
+
+    -   13,158 loans are in outstanding with 7,260 defaulting or overdue loans and 5,898 maintaining good standing as normal loans. 36,841 were already fully paid. The pie charts displays more info on the distribution.
+    -   Distribution of Payment Plan among all loan status category showed no difference whereas their verification status are distinguished in the chart.
+    -   The Distribution of Loan Amounts and interest rate by Current Loan Status was plotted as an histogram. The Loan amount distribution showed a slightly right skewed distribution, showing lots of lower amounts and some higher amount in default. The interest rate distribution shows us an almost normal distribution and more rate in the middle defaulting.
+    
+-   **The Numeric Factors Correlation** pane focused on numeric factors visual engaging Default/ loan overdue and more statistic. Finding shows that:
+
+    -   36,149,044 loans volume principal are in outstanding with 2,054,452 overdue principal amount. 36 months shows the loan term of most defaulter. 
+    -   The Portfolio at Risk report 6% volume for overdue >= 1 month and 55% customer counts for loan overdue >= 1 month which is a pointer that high number of clients are in overdue.
+    -   Correlation of Money and otherVariables with Default was displyed on the heat map to show their correlation with each other and the point biseral to show correlation with default, blue reflects very high correlation.
+    
+-   **The Categorical Factors Correlation** pane focused on categorical factors visual engaging Default/ loan overdue. Finding shows that:
+
+    -   The crosstabs or stack bar charts shows the proportion of loans in overdue compared with normal loans and shows pattern in some of the factors sub-category distribution.
+    -   Crosstabs that has shown no difference is payment plan, the visual is a continum from Loan overview where Y payment plan was absent, this is because of its insufficiency in the dataset, and hence cannot be seen as a contributor to default.
+    -   Crosstabs that has shown patterns is the grade and subgrade factor, showing as grade rises so does default.
+    -   Others that may show some effect on default are Loan purpose, house ownership, employment length, verisfication status and loan term
+    -   While 100% overdue doesnt implies high impact, because sufficiency for those attribute may be low, hence the need for statistical test to determine their true impact
+
+-   **The Statistical** pane gives more information on the variables that have shown some influence on default. Finding shows that:
+
+    -   The Chisquare test measures the difference between the observed and expected frequencies of a categorical variable. Larger values indicate a greater discrepancy between the observed and expected distributions. The Logistic regression analysis was used to determine the best factors of high influence on default. 
+    -   The Tukey HSD test results indicate that several numerical variables show significant differences between "Overdue" and "Normal" loans. This includes total accounts, open accounts, loan amount, outstanding principal, annual income, debt-to-income ratio, and revolving balance. The logistic regression will be used to emphasize what factor has high influence on default.
+    -   The Distribution of Loan Amounts and interest rate by Current Loan Status was plotted as an histogram. The Loan amount distribution showed a slightly right skewed distribution, showing lots of lower amounts and some higher amount in default. The interest rate distribution shows us an almost normal distribution and more rate in the middle defaulting.
+    - The logistic regression results indicate that several numerical variables, such as loan amount, outstanding principal, interest rate, annual income, debt-to-income ratio, revolving balance, and revolving utilization, significantly impact the likelihood of loan default.
+    - Also, Higher loan grades and some sub-grades significantly increase the odds of default.Renting a home and certain loan terms or months of issuance are associated with higher or lower default odds. Verification status affects the likelihood of default, with verified loans being less risky.
+    
+-   **The Default Prediction** pane focused on trend and geographical visual engaging Default/ loan overdue. Finding shows that:
+
+    -  The line chart showing default trend by loan issued date date and last payment date reveals that as loan were issued accross the years, default rises. Conversely default lowers with last payment date, this is an expected nuance.
+    -   The forcast line plot of default count by their issued date has an Mean Absolute Error MAE of 14.92 this means that the typical prediction error (the average amount by which the forecasted default counts deviate from the actual counts) is about 14.92 defaults. While the RMSE i.e. Root Mean Squared Error indicates that the standard deviation of the prediction errors (residuals) is about 18.39 defaults . 
+    - The presence of an RMSE higher than the MAE but still relatively close in value suggests that while the model is generally accurate, there are instances where it can significantly deviate. 
+    - For decision-making or strategic planning regarding loan defaults, understanding the magnitude of these errors helps in assessing the level of confidence to be placed in the forecasts. An MAE and RMSE in the range provided might be acceptable depending on the total volume of defaults and the operational thresholds for risk management.
+    - The geographical Distribution of Loan Default by state shows the proportion of default counts from different regions in the USA. The plot reviews that Nebraska with 55% has more than half of the defaulter settled there. Operations needs to find out if there was a recent economic issue or events that might have contributed to them defaulting their loans. 
+
+</font>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE)
+# Load necessary libraries for meta data inspection
+library(flexdashboard)
+library(tidyverse) #contains library(dplyr)
+library(knitr)
+library(kableExtra)
+library(DT)
+library(DataExplorer)
+library(htmltools)
+library(htmlwidgets)
+library(prophet)
+library(dygraphs)
+library(corrplot)
+library(sjPlot)
+library(sjmisc)
+#library(pscl)
+library(broom)
+```
+
+```{r message=FALSE, warning=FALSE}
+#import important libraries for data cleaning and exploration
+#library(tidyverse)  #helps wrangle data
+library(lubridate)  #helps wrangle date attributes
+library(ggplot2)  #helps visualize data
+library(plotly)
+library(DescTools)
+```
+
+```{r include=FALSE}
+#read the data
+#loan_data <- readxl::read_excel("Loan_data.xlsx")
+loan_data <-read.csv("Loan_data.csv")
+```
+
+# Metadata Info
+
+```{r}
+#Data Cleaning function for modularity
+# Single function to clean the dataset
+clean_loan_data <- function(data) {
+  # Remove incoherent and high missing value and similar columns and columns not useful for objective
+  data <- data %>%
+    select(-c(X,member_id, desc, title, verification_status_joint, dti_joint, mths_since_last_record, mths_since_last_delinq, earliest_cr_line, last_credit_pull_d, next_pymnt_d, mths_since_last_major_derog, annual_inc_joint, emp_title, policy_code, zip_code, funded_amnt, funded_amnt_inv, out_prncp_inv, total_pymnt, total_pymnt_inv, total_rec_prncp, total_rec_int, total_rec_late_fee, recoveries, collection_recovery_fee, collections_12_mths_ex_med, last_pymnt_amnt, application_type, initial_list_status))
+  
+  # Convert some categorical columns to factors 
+  data <- data %>%
+  # Add columns for full date in dmy format and extract month, year, quarter
+  mutate(across(c(issue_d, last_pymnt_d),
+                ~ dmy(paste("01", ., sep = "-")), .names = "{col}")) %>% 
+    mutate(across(c(issue_d, last_pymnt_d),
+                list(
+                     month = ~ factor(month(.), levels = 1:12, labels = month.abb, ordered = TRUE),
+                     year = ~ year(.), 
+                     quarter = ~ paste0("Q", quarter(.))), 
+                .names = "{col}_{fn}"),
+           last_pymnt_d = if_else(is.na(last_pymnt_d), issue_d, last_pymnt_d)  # Replace NA with issue_d
+           
+           )
+  
+  # Recategorize loan_status into default and non-default
+  data <- data %>% mutate(loan_status_category = case_when(
+    loan_status %in% c("Fully Paid", "Current") ~ "AllPaid/ Current non-Default",
+    loan_status %in% c("Charged Off", "Does not meet the credit policy. Status:Charged Off", "Does not meet the credit policy. Status:Fully Paid","Late (31-120 days)", "Late (16-30 days)", "Default", "In Grace Period") ~ "Now/Then Default"
+  ))
+  
+  # Recategorize loan_status into Overdue, finished and oustanding
+  data <- data %>%
+  mutate(loan_status = case_when(
+    loan_status %in% c("Current") ~ "Normal",
+    loan_status %in% c("Fully Paid", "Does not meet the credit policy. Status:Fully Paid") ~ "Fully Paid",
+    loan_status %in% c("Charged Off", "Does not meet the credit policy. Status:Charged Off", "Late (31-120 days)", "Late (16-30 days)", "Default", "In Grace Period") ~ "Overdue"
+  ))
+  
+  # Recode and rename verification_status column
+  data <- data %>%
+  mutate(verification_status = recode(verification_status,
+                                "Verified" = "Verified",
+                                "Source Verified" = "Verified",
+                                "Not Verified" = "Not Verified"))
+  #paid and unpaid term
+  data <- data %>%
+  #filter(loan_status == "Overdue") %>%
+  mutate(
+    paid_term = interval(issue_d, last_pymnt_d) %/% months(1),   # Calculate the number of months between dates
+    total_term = as.numeric(sub(" months", "", term)),  # Extract numeric value from term
+    unpaid_term = total_term - paid_term  # Calculate unpaid_term
+  )
+  
+  #Recoding Default to Binary
+  
+  data <- data %>%
+  mutate(default_binary = ifelse(loan_status == "Overdue", 1, 0))
+
+  
+  return(data)
+}
+
+# cleaning the dataset renamed to all_dtrips
+loan_dataset <- clean_loan_data(loan_data)
+
+```
+
+## Row
+
+### Raw Data Metadata Info
+
+```{r echo=FALSE, warning=FALSE}
+# Create metadata report using DataExplorer
+
+# Generate the report and save it to an HTML file if it doesn't exist
+if (!file.exists("data_report.html")) {
+  create_report(loan_data, output_file = "data_report.html", config = configure_report(plot_str_args = list(type = "diagonal", fontSize = 15, width = 900, margin = list(left = 350, right = 250)),), report_title = "Metadata Info for Raw")
+}
+#width="100%" height="600px" frameborder="0" scrolling="auto" data-external="1"
+```
+
+<!-- Embed the HTML report using an iframe -->
+
+<iframe src="data_report.html" width="100%" height="100%" frameborder="0" scrolling="auto" data-external="1">
+
+</iframe>
+
+### Cleaned Data Metadata Info
+
+```{r echo=FALSE, warning=FALSE}
+# Create metadata report using DataExplorer
+
+# Generate the report and save it to an HTML file if it doesn't exist
+if (!file.exists("cdata_report.html")) {
+  create_report(loan_dataset, output_file = "cdata_report.html",config = configure_report(plot_str_args = list(type = "diagonal", fontSize = 15, width = 900, margin = list(left = 350, right = 250)),), report_title = "Metadata Info for Cleaned")
+}
+#tags$iframe(src = "data_report.html", width = '100%', height = '600px', frameborder = 0, scrolling = 'auto') now works becos of dygraph library
+```
+
+<!-- Embed the HTML report using an iframe -->
+
+<iframe src="cdata_report.html" width="100%" height="100%" frameborder="0" scrolling="auto" data-external="1">
+
+</iframe>
+
+# Loan Overview
+
+## Row
+
+### Number of Current Outstanding Loans
+
+```{r}
+# Define a value box for the number of Outstanding loans
+
+valueBox(value = format(n_distinct(subset(loan_dataset,
+                                          
+            loan_status == "Normal"
+           | loan_status =="Overdue"
+           )$id),big.mark = ","),
+           #icon = "fa-thumbs-o-up",
+           color = "orange"
+           )
+```
+
+### Number of Current Overdue Loans
+
+```{r}
+# Define a value box for the number of default loans
+valueBox(value = format(n_distinct(subset(loan_dataset,
+                                          
+            loan_status =="Overdue"
+           )$id),big.mark = ","),
+  icon = "fa fa-warning",
+  color = "red")
+```
+
+### Number of Normal Outstanding Loans
+```{r}
+# Define a value box for the number of default loans
+valueBox(
+  value = format(n_distinct(subset(loan_dataset,
+                                          
+            loan_status == "Normal"
+           )$id),big.mark = ","),
+  color = "blue")
+```
+
+### Number of Fully Paid Loans
+```{r}
+loan_data_finished <- loan_dataset %>%
+  filter(loan_status == "Fully Paid") %>%
+  count() %>%
+  pull(n)
+# Define a value box for the number of default loans
+valueBox(
+  value = format(round(loan_data_finished), big.mark = ","),
+  #subtitle = "Number of nonDefault Loans",
+  #icon = "fa fa-warning",
+  color = "green")
+```
+
+
+## Row
+
+### Distribution of Customers by Current Loan Status
+
+```{r}
+# Plot a bar chart showing the distribution of default categories
+# Create a summary table for loan status categories
+loan_status_summary <- loan_dataset %>%
+  count(loan_status) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Plot a pie chart showing the distribution of default categories
+plot_ly(loan_status_summary, labels = ~loan_status, values = ~n, type = 'pie',
+        textinfo = 'label+percent',
+        insidetextorientation = 'radial',
+        marker = list(colors = c("blue", "green","red"))) %>% layout(showlegend = FALSE) # Remove the legend
+```
+
+### Distribution of Customers by General Loan Status
+```{r}
+# Plot a bar chart showing the distribution of default categories
+# Create a summary table for loan status categories
+loan_status_summary <- loan_dataset %>%
+  count(loan_status_category) %>%
+  mutate(percentage = n / sum(n) * 100)
+
+# Plot a pie chart showing the distribution of default categories
+plot_ly(loan_status_summary, labels = ~loan_status_category, values = ~n, type = 'pie',
+        textinfo = 'label+percent',
+        insidetextorientation = 'radial',
+        marker = list(colors = c("green", "red"))) %>% layout(showlegend = FALSE) # Remove the legend
+```
+
+## Row
+
+### Distribution of Payment Plans by Current Loan Status
+```{r}
+# Create a ggplot bar chart
+ggplot_chart <- ggplot(loan_dataset, aes(x = loan_status, y = n_distinct(id),  fill = pymnt_plan)) +
+  geom_bar(stat = "identity", 
+           position = "fill") + 
+  scale_y_continuous(labels = scales::percent) + scale_fill_manual(values = c("y" = "green", "n" = "orange")) +
+  labs(x = "Loan Status",
+       y = "% Share of Customers",
+       fill = "PayPlan") +
+  theme_minimal()
+
+# Convert ggplot to a plotly object for interactive tooltips
+#plotly_chart <- ggplotly(ggplot_chart)
+
+# Display the plotly chart
+ggplot_chart
+```
+
+### Distribution of Verification by Current Loan Status
+```{r}
+# Create a ggplot bar chart
+ggplot_chart <- ggplot(loan_dataset, aes(x = loan_status, y= n_distinct(id), fill = verification_status)) +
+  geom_bar(stat = "identity", 
+           position = "fill") + 
+  scale_y_continuous(labels = scales::percent) + scale_fill_manual(values = c("Verified" = "green", "Not Verified" = "orange")) +
+  labs(x = "Loan Status",
+       y = "% Share of Customers",
+       fill = "VeriStatus") +
+  theme_minimal()
+
+# Convert ggplot to a plotly object for interactive tooltips
+#plotly_chart <- ggplotly(ggplot_chart, tooltip = c("x", "y")) 
+
+# Display the plotly chart
+ggplot_chart
+```
+
+## Row
+### Distribution of Loan Amounts by Current Loan Status
+```{r}
+# Relationship between loan amount and Loan Status
+hist_chart <- ggplot(loan_dataset %>% filter(loan_status %in% c("Normal", "Overdue")),
+                     aes(x = loan_amnt, fill = loan_status)) +
+  geom_histogram(position = "dodge", bins = 30) +
+  labs(x = "Loan Amount", y = "Number of Customers") +
+  scale_fill_manual(values = c("Overdue" = "red", "Normal" = "green")) +
+  theme_minimal() +
+  theme(legend.position = "none")
+# Convert ggplot to a plotly object for interactive tooltips
+plothist_chart <- ggplotly(hist_chart)
+
+# Display the plotly chart
+plothist_chart
+```
+
+### Distribution of Interest Rate by Current Loan Status
+```{r}
+# Relationship between loan amount and Loan Status
+hist_chart <- ggplot(loan_dataset %>% filter(loan_status %in% c("Normal", "Overdue")),
+                     aes(x = int_rate, fill = loan_status)) +
+  geom_histogram(position = "dodge", bins = 30) +
+  labs(x = "Interest Rate", y = "Number of Customers") +
+  scale_fill_manual(values = c("Overdue" = "red", "Normal" = "green")) +
+  theme_minimal() +
+  theme(legend.position = "none")
+# Convert ggplot to a plotly object for interactive tooltips
+plothist_chart <- ggplotly(hist_chart)
+
+# Display the plotly chart
+plothist_chart
+```
+
+# Numeric Factors Correlation
+
+## Row
+
+### Outstanding Principal Amount
+
+```{r}
+# Define a value box for the number of default loans
+valueBox(value = format(sum(subset(loan_dataset,
+                                          
+            loan_status == "Normal"
+           | loan_status =="Overdue"
+           )$out_prncp),big.mark = ","),
+  #icon = "fa fa-warning",
+  color = "orange")
+```
+
+### Overdue Principal Amount
+
+```{r}
+# Define a value box for the number of default loans
+valueBox(value = format(sum(subset(loan_dataset,
+           loan_status =="Overdue"
+           )$out_prncp),big.mark = ","),
+  icon = "fa fa-warning",
+  color = "red")
+```
+
+### Not Overdue Principal Amount
+
+```{r}
+# Define a value box for the number of default loans
+valueBox(value = format(sum(subset(loan_dataset,
+           loan_status == "Normal"
+           )$out_prncp), big.mark = ","),
+  #icon = "fa fa-warning",
+  color = "green")
+```
+
+### Popular Tenure of Defaulters Loan
+```{r}
+valueBox((format(Mode(loan_dataset$term), big.mark = ",")),
+         color = "blue")
+```
+
+
+## Row {data-width="250" data-height="140"}
+
+### Portfolio at Risk of Outstanding Principal Volume >= 1 Month
+```{r}
+
+gauge(value = round((as.integer(sum(subset(loan_dataset,
+           loan_status =="Overdue"
+           )$out_prncp))/
+             
+          (as.integer(sum(subset(loan_dataset,
+           loan_status =="Overdue" | loan_status =="Normal" 
+            & unpaid_term > 0 
+           )$out_prncp))) * 100), 0)
+        , min = 0, max = 100, symbol = '%', label = "PAR 1 Volume", gaugeSectors(
+    success = c(0, 19.9), warning = c(20, 49.9), danger = c(50, 100)
+  ))
+```
+
+
+### Portfolio at Risk of Number of Outstanding Loans >= 1 Month
+```{r}
+
+gauge(value = round((as.integer(n_distinct(subset(loan_dataset,
+           loan_status =="Overdue"
+           )$id))/
+             
+          (as.integer(n_distinct(subset(loan_dataset,
+           loan_status =="Overdue" | loan_status =="Normal" 
+            & unpaid_term > 0 
+           )$id))) * 100), 0)
+        , min = 0, max = 100, symbol = '%', label = "PAR 1 Number", gaugeSectors(
+    success = c(0, 19.9), warning = c(20, 49.9), danger = c(50, 100)
+  ))
+```
+
+## Row
+
+### Correlation of Money Variables 
+```{r}
+# Select numerical variables
+numeric_vars_default <- loan_dataset %>% filter(loan_status == "Overdue") %>%
+  select(loan_amnt, out_prncp, int_rate, annual_inc, dti, revol_bal, revol_util)
+         
+         #, total_acc, open_acc, acc_now_delinq, inq_last_6mths, )
+
+# Compute correlation matrix
+correlation_matrix_default <- cor(numeric_vars_default, method='pearson', use = "complete.obs")
+
+# Plot correlation matrix
+corrplot(correlation_matrix_default, method = "circle", type = "upper", addCoef.col = "black")
+```
+
+### Correlation of Money Variables with Default
+```{r}
+# Select relevant numerical variables
+numeric_vars <- c("loan_amnt", "out_prncp", "int_rate", "annual_inc", "dti", "revol_bal", "revol_util")
+
+# Calculate point-biserial correlation for each numerical variable
+correlations <- sapply(numeric_vars, function(var) {
+  cor.test(loan_dataset[[var]], loan_dataset$default_binary)$estimate
+})
+
+# Create a data frame of correlations
+correlation_df <- data.frame(variable = numeric_vars, correlation = correlations)
+
+# Print the correlation values
+#print(correlation_df)
+
+# Bar plot for visualizing point-biserial correlations
+p <- ggplot(correlation_df, aes(x = variable, y = correlation, fill = correlation)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Variable",
+       y = "Point-Biserial Correlation") +
+  scale_fill_gradient2(low = "red", mid = "white", high = "blue", midpoint = 0) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Add tooltips using plotly
+p <- ggplotly(p, tooltip = c("x", "y"))
+
+# Print the plot
+p
+```
+
+## Row
+
+### Correlation of Other Numeric variables 
+```{r}
+# Select numerical variables
+numeric_vars_default <- loan_dataset %>% filter(loan_status == "Overdue") %>%
+  select(total_acc, open_acc, acc_now_delinq, inq_last_6mths)
+         
+         #, total_acc, open_acc, acc_now_delinq, inq_last_6mths, )
+
+# Compute correlation matrix
+correlation_matrix_default <- cor(numeric_vars_default, method='pearson', use = "complete.obs")
+
+# Plot correlation matrix
+corrplot(correlation_matrix_default, method = "circle", type = "upper", addCoef.col = "black")
+```
+
+### Correlation of Other Numeric with Default 
+```{r}
+# Select relevant numerical variables
+numeric_vars <- c("total_acc", "open_acc", "acc_now_delinq", "inq_last_6mths")
+
+# Calculate point-biserial correlation for each numerical variable
+correlations <- sapply(numeric_vars, function(var) {
+  cor.test(loan_dataset[[var]], loan_dataset$default_binary)$estimate
+})
+
+# Create a data frame of correlations
+correlation_df <- data.frame(variable = numeric_vars, correlation = correlations)
+
+# Print the correlation values
+#print(correlation_df)
+
+# Bar plot for visualizing point-biserial correlations
+p <- ggplot(correlation_df, aes(x = variable, y = correlation, fill = correlation)) +
+  geom_bar(stat = "identity") +
+  labs( x = "Variable",
+       y = "Point-Biserial Correlation") +
+  scale_fill_gradient2(low = "red", mid = "white", high = "blue", midpoint = 0) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Add tooltips using plotly
+p <- ggplotly(p, tooltip = c("x", "y"))
+
+# Print the plot
+p
+```
+
+# Categorical Factors Correlation
+
+## Row
+
+```{r}
+# Filter the data to only include "Overdue" loans
+loan_data_default <- loan_dataset %>% filter(loan_status %in% c("Normal", "Overdue"))  %>% select(-loan_status_category)
+
+# Replace NA in issue_month with "Missing"
+loan_data_default <- loan_data_default %>%
+  mutate(issue_d_month = ifelse(is.na(issue_d_month), "Missing", issue_d_month))
+
+# Function to plot crosstab for a given variable
+plot_crosstab <- function(var) {
+ p <- ggplot(loan_data_default, aes_string(x = var, fill = "loan_status")) +
+    geom_bar(position = "fill") +
+    scale_fill_manual(values = c("Current" = "green", "Overdue" = "red")) +
+    labs(#title = paste("Proportion of Loan Status by", var),
+         x = var, y = "Proportion") +
+    theme_minimal()+
+  theme(legend.position = "none")
+ 
+ #ggplotly(p, tooltip = c(var, "loan_status", "count", "proportion"))
+}
+
+# Select the categorical variables
+categorical_vars <- c("pymnt_plan", "grade", "sub_grade", "emp_length", "home_ownership", "verification_status", "term", "issue_d_month", "purpose", "issue_d_quarter")
+```
+
+
+### Proportion of Loan Status by PaymentPlan
+```{r}
+# Loop through the variables and plot each one
+#for (var in categorical_vars) {print(plot_crosstab(var))}
+
+# Call the function for a specific variable
+specific_variable <- "pymnt_plan"  # Replace with the variable you want to plot
+
+# Generate the plot for the specific variable
+plot <- plot_crosstab(specific_variable)
+
+# Convert to an interactive plot using ggplotly
+interactive_plot <- ggplotly(plot, tooltip = c(specific_variable, "fill", "y"))
+
+# Display the interactive plot
+interactive_plot
+```
+
+### Proportion of Loan Status by Loan Purpose
+```{r}
+#categorical_vars <- c("pymnt_plan", "grade", "sub_grade", "emp_length", "home_ownership", "verification_status", "term", "issue_d_month", "Purpose", "issue_d_quarter")
+
+# Call the function for a specific variable
+specific_variable <- "purpose"  # Replace with the variable you want to plot
+
+# Generate the plot for the specific variable
+plot <- plot_crosstab(specific_variable)
+
+# Convert to an interactive plot using ggplotly
+interactive_plot <- ggplotly(plot, tooltip = c(specific_variable, "fill", "y"))
+
+# Display the interactive plot
+interactive_plot
+```
+
+## Row
+
+### Proportion of Loan Status by Loan Grade
+```{r}
+#categorical_vars <- c("pymnt_plan", "grade", "sub_grade", "emp_length", "home_ownership", "verification_status", "term", "issue_d_month", "Purpose", "issue_d_quarter")
+
+# Call the function for a specific variable
+specific_variable <- "grade"  # Replace with the variable you want to plot
+
+# Generate the plot for the specific variable
+plot <- plot_crosstab(specific_variable)
+
+# Convert to an interactive plot using ggplotly
+interactive_plot <- ggplotly(plot, tooltip = c(specific_variable, "fill", "y"))
+
+# Display the interactive plot
+interactive_plot
+```
+
+### Proportion of Loan Status by Loan Sub-Grade
+```{r}
+#categorical_vars <- c("pymnt_plan", "grade", "sub_grade", "emp_length", "home_ownership", "verification_status", "term", "issue_d_month", "Purpose", "issue_d_quarter")
+
+# Call the function for a specific variable
+specific_variable <- "sub_grade"  # Replace with the variable you want to plot
+
+# Generate the plot for the specific variable
+plot <- plot_crosstab(specific_variable)
+
+# Convert to an interactive plot using ggplotly
+interactive_plot <- ggplotly(plot, tooltip = c(specific_variable, "fill", "y"))
+
+# Display the interactive plot
+interactive_plot
+```
+
+## Row
+
+### Proportion of Loan Status by Home Ownership
+```{r}
+#categorical_vars <- c("pymnt_plan", "grade", "sub_grade", "emp_length", "home_ownership", "verification_status", "term", "issue_d_month", "Purpose", "issue_d_quarter")
+
+# Call the function for a specific variable
+specific_variable <- "home_ownership"  # Replace with the variable you want to plot
+
+# Generate the plot for the specific variable
+plot <- plot_crosstab(specific_variable)
+
+# Convert to an interactive plot using ggplotly
+interactive_plot <- ggplotly(plot, tooltip = c(specific_variable, "fill", "y"))
+
+# Display the interactive plot
+interactive_plot
+```
+
+
+### Proportion of Loan Status by Home Ownership
+```{r}
+#categorical_vars <- c("pymnt_plan", "grade", "sub_grade", "emp_length", "home_ownership", "verification_status", "term", "issue_d_month", "Purpose", "issue_d_quarter")
+
+# Call the function for a specific variable
+specific_variable <- "verification_status"  # Replace with the variable you want to plot
+
+# Generate the plot for the specific variable
+plot <- plot_crosstab(specific_variable)
+
+# Convert to an interactive plot using ggplotly
+interactive_plot <- ggplotly(plot, tooltip = c(specific_variable, "fill", "y"))
+
+# Display the interactive plot
+interactive_plot
+```
+
+
+## Row
+
+### Proportion of Loan Status by Employment Length
+```{r}
+#categorical_vars <- c("pymnt_plan", "grade", "sub_grade", "emp_length", "home_ownership", "verification_status", "term", "issue_d_month", "Purpose", "issue_d_quarter")
+
+# Call the function for a specific variable
+specific_variable <- "emp_length"  # Replace with the variable you want to plot
+
+# Generate the plot for the specific variable
+plot <- plot_crosstab(specific_variable)
+
+# Convert to an interactive plot using ggplotly
+interactive_plot <- ggplotly(plot, tooltip = c(specific_variable, "fill", "y"))
+
+# Display the interactive plot
+interactive_plot
+```
+
+### Proportion of Loan Status by Term
+```{r}
+#categorical_vars <- c("pymnt_plan", "grade", "sub_grade", "emp_length", "home_ownership", "verification_status", "term", "issue_d_month", "Purpose", "issue_d_quarter")
+
+# Call the function for a specific variable
+specific_variable <- "term"  # Replace with the variable you want to plot
+
+# Generate the plot for the specific variable
+plot <- plot_crosstab(specific_variable)
+
+# Convert to an interactive plot using ggplotly
+interactive_plot <- ggplotly(plot, tooltip = c(specific_variable, "fill", "y"))
+
+# Display the interactive plot
+interactive_plot
+```
+
+# Statistical Tests
+
+## Row
+
+### Chi-Squared Test with Categorical Variables
+```{r}
+#loan_data_default2 <- loan_dataset %>% filter(loan_status == "Overdue")
+# Create a function to perform a Chi-squared test
+chi_squared_test <- function(var) {
+  table_data <- table(loan_data_default[[var]], loan_data_default$loan_status)
+  test <- chisq.test(table_data)
+  return(test)
+}
+
+# Perform Chi-squared tests for each categorical variable
+chi_squared_results <- lapply(categorical_vars, chi_squared_test)
+
+# Assign names to the results
+names(chi_squared_results) <- categorical_vars
+
+# Function to extract test statistics from Chi-squared test results
+extract_chisq_info <- function(test_result) {
+  data.frame(
+    Chi_squared_statistic = test_result$statistic,
+    p_value = test_result$p.value,
+    df = test_result$parameter
+  )
+}
+
+# Combine results into a single data frame
+chisq_summary <- bind_rows(lapply(chi_squared_results, extract_chisq_info), .id = "Variable")
+
+# Print the summary table with kable for better formatting
+kable(chisq_summary, caption = "ChiSquare Model Coefficients", format = "html", table.attr = "class='table table-striped'") %>%
+ kable_styling(bootstrap_options = c("striped", "hover", "condensed", "bordered"), full_width = FALSE) %>%
+  scroll_box(width = "100%", height = "400px")
+```
+
+
+
+### Logistic Regression for Categorical Variables
+```{r}
+# Load your data and prepare it
+loan_data_default <- loan_data_default %>%
+  mutate(
+    pymnt_plan = as.factor(pymnt_plan),
+    grade = as.factor(grade),
+    sub_grade = as.factor(sub_grade),
+    emp_length = as.factor(emp_length),
+    home_ownership = as.factor(home_ownership),
+    verification_status = as.factor(verification_status),
+    purpose = as.factor(purpose),
+    issue_d_quarter = as.factor(issue_d_quarter),
+    issue_d_month = as.factor(issue_d_month),
+    term = as.factor(term),
+    loan_status = as.factor(loan_status)  # Ensure the response variable is a factor
+  ) %>%
+  drop_na()  # Handle missing values
+
+# Fit logistic regression model
+model <- glm(loan_status ~ pymnt_plan + grade + sub_grade + emp_length + home_ownership + verification_status + term + issue_d_month + purpose + issue_d_quarter, 
+              data = loan_data_default, family = binomial)
+
+# Get summary
+model_summary <- summary(model)
+
+# Extract relevant metrics
+model_info <- tidy(model)
+
+
+# Extract and display key metrics: coefficients and p-values
+model_summary_df <- broom::tidy(model) %>%
+  select(term = term, estimate, std.error, statistic, p.value) %>%
+  mutate(Significant = ifelse(p.value < 0.05, "Yes", "No"))
+
+
+# Create a scrollable table for the model summary
+kable(model_summary_df, caption = "Logistic Regression Model Coefficients", format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "bordered"), full_width = FALSE) %>%
+  scroll_box(width = "100%", height = "400px")
+
+```
+
+## Row
+### Anova Of Numerical Variables Impact on Default
+```{r}
+# List of numerical variables
+numeric_vars <- c("total_acc", "open_acc", "acc_now_delinq", "inq_last_6mths", 
+                  "loan_amnt", "out_prncp", "int_rate", "annual_inc", "dti", 
+                  "revol_bal", "revol_util")
+
+# Filter out rows with missing values for the selected numeric variables and loan_status
+loan_data_filtered <- loan_data_default %>%
+  select(all_of(c(numeric_vars, "loan_status"))) %>%
+  drop_na()
+
+# Function to perform ANOVA and Tukey's HSD test
+perform_tukey_test <- function(var) {
+  # Perform ANOVA
+  formula <- as.formula(paste(var, "~ loan_status"))
+  aov_result <- aov(formula, data = loan_data_filtered)
+  
+  # Perform Tukey's HSD test
+  tukey_result <- TukeyHSD(aov_result)
+  
+  # Extract the Tukey test results and convert to data frame
+  tukey_df <- as.data.frame(tukey_result$loan_status)
+  tukey_df <- tibble::rownames_to_column(tukey_df, "Comparison")
+  tukey_df$Variable <- var
+  return(tukey_df)
+}
+
+# Apply the function to each numerical variable
+tukey_results <- lapply(numeric_vars, perform_tukey_test)
+
+# Combine all Tukey test results into one data frame
+combined_tukey_df <- bind_rows(tukey_results)
+
+# Create a table using kable adding column alignment and footnotes
+kable(combined_tukey_df, caption = "Tukey HSD Test Results", format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "bordered"), full_width = FALSE) %>%
+  column_spec(1, bold = TRUE, border_right = TRUE) %>%
+  footnote(general = "Tukey HSD results for numerical variables impacting default status.") %>%
+  scroll_box(width = "100%", height = "400px")
+```
+
+### Logistic Regression On Numerical Variables Impact
+```{r}
+# Binary outcome for default
+loan_data_default <- loan_data_default %>%
+  mutate(default = ifelse(loan_status == "Overdue", 1, 0))
+
+# Handle missing values by removing rows with NAs in relevant columns
+loan_data_default <- loan_data_default %>%drop_na(loan_amnt, out_prncp, int_rate, annual_inc, dti, revol_bal, revol_util, total_acc, open_acc, acc_now_delinq, inq_last_6mths)
+
+# Fit logistic regression model
+model <- glm(default ~ loan_amnt + out_prncp + int_rate + annual_inc + dti + revol_bal + revol_util + total_acc + open_acc + acc_now_delinq + inq_last_6mths,
+             data = loan_data_default, family = binomial)
+
+# Get summary
+model_summary <- summary(model)
+
+# Extract relevant metrics
+model_info <- broom::tidy(model)
+
+# Extract and display key metrics: coefficients and p-values
+model_summary_df <- broom::tidy(model) %>%
+  select(term, estimate, std.error, statistic, p.value) %>%
+  mutate(Significant = ifelse(p.value < 0.05, "Yes", "No"))
+
+# Create a scrollable table for the model summary
+kable(model_summary_df, caption = "Logistic Regression Model Coefficients", format = "html") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "bordered"), full_width = FALSE) %>%
+  scroll_box(width = "100%", height = "400px")
+```
+
+# Default Prediction
+
+Column {.tabset}
+-------------------------------------
+
+### Default Trends by Loan Issue Dates and Last Payment Dates
+
+```{r echo=FALSE, warning=FALSE}
+# Prepare data for plotting
+default_trends <- loan_data_default %>% 
+  filter(loan_status == "Overdue") %>%
+  select(issue_d, last_pymnt_d) %>%
+  pivot_longer(cols = c(issue_d, last_pymnt_d), 
+               names_to = "date_type", values_to = "date") %>%
+  group_by(date_type, date) %>%
+  summarise(default_count = n()) %>%
+  arrange(date)
+
+# Plot with ggplot2
+p <- ggplot(default_trends, aes(x = date, y = default_count, color = date_type)) +
+  geom_line(size = 1) +
+  labs(#title = "Default Trends by Issue and Last Payment Dates",
+       x = "Date", y = "Number of Defaults",
+       color = "Date Type") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Add tooltips using plotly
+ggplotly(p, tooltip = c("x", "y"))
+
+```
+
+### Forecast of Default Loans Counts by Loan Issue Dates
+```{r}
+# Prepare data for prophet
+prophet_data <- loan_data_default %>%
+  filter(loan_status == "Overdue")%>%
+  group_by(issue_d) %>%
+  summarise(default_count = n()) %>%
+  rename(ds = issue_d, y = default_count)
+
+# Fit prophet model
+model <- prophet(prophet_data)
+
+# Create a dataframe with future dates
+future <- make_future_dataframe(model, periods = 365)  # Predicting for the next 365 days
+
+# Make predictions
+forecast <- predict(model, future)
+
+# Calculate and print performance metrics (optional)
+actuals <- prophet_data$y
+predictions <- forecast$yhat[1:nrow(prophet_data)]
+
+mae <- mean(abs(actuals - predictions))
+rmse <- sqrt(mean((actuals - predictions)^2))
+
+
+# Plot the forecast
+dygraph_plot <- dyplot.prophet(model, forecast)
+
+# Create an HTML widget with custom annotations
+annotate_text <- sprintf("MAE: %.2f\nRMSE: %.2f", mae, rmse)
+annotation <- tags$div(style = "position: absolute; top: 10px; right: 10px; background-color: white; padding: 5px; border: 1px solid black;", annotate_text)
+
+# Combine the dygraph and the annotation
+combined_widgetP <- htmlwidgets::prependContent(dygraph_plot, annotation)
+
+# Print the combined widget
+combined_widgetP
+```
+
+
+### Geographic Distribution of Loan Defaults by State
+```{r echo=FALSE, warning=FALSE}
+library(maps)   # For map data
+library(ggthemes) # For theme map
+
+# Helper function to convert state abbreviations to full names
+state_abbrev_to_name <- function(abbrev) {
+  state.name[match(abbrev, state.abb)]
+}
+
+# Aggregate loan data by state and loan status
+state_data <- loan_dataset %>%
+  group_by(addr_state, loan_status) %>%
+  summarize(count = n()) %>%
+  ungroup()
+
+# Calculate the proportion of defaults in each state
+state_summary <- state_data %>%
+  group_by(addr_state) %>%
+  mutate(total_loans = sum(count),
+         default_proportion = count / total_loans) %>%
+  filter(loan_status == "Overdue")
+
+# Convert state abbreviations to full names
+state_summary <- state_summary %>%
+  mutate(region = tolower(state_abbrev_to_name(addr_state)))
+
+# Get map data for the United States
+us_states <- map_data("state")
+
+# Merge map data with loan data
+map_data_merged <- state_summary %>%
+  inner_join(us_states, by = "region")
+
+# Plot the map
+p <- ggplot(map_data_merged, aes(x = long, y = lat, group = group))  +
+  geom_polygon(aes(fill = default_proportion, 
+                   text = paste("State:", region, 
+                                "<br>Default Proportion:", round(default_proportion, 4))),
+               color = "white") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue", na.value = "grey50",
+                      name = "Default Proportion") +
+  theme_map() +
+  labs(#title = "Geographic Distribution of Loan Defaults by State",
+       subtitle = "Proportion of Defaults in Each State",
+       caption = "Data Source: Loan Dataset") +
+  theme(legend.position = "bottom")
+ggplotly(p, tooltip = "text")
+```
+
+
